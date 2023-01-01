@@ -1,5 +1,10 @@
 package com.kegmil.example.pcbook.service;
 
+import com.kegmil.example.pcbook.elasticSearch.JavaElasticSearch;
+import com.kegmil.example.pcbook.SearchFilterHelper.SearchBuildHelper;
+import com.kegmil.example.pcbook.elasticSearch.SearchResult;
+import com.kegmil.example.pcbook.mapper.JsonHelper;
+import com.kegmil.example.pcbook.mapper.ProtoEntityMapper;
 import com.kegmil.example.pcbook.pb.CreateLaptopRequest;
 import com.kegmil.example.pcbook.pb.CreateLaptopResponse;
 import com.kegmil.example.pcbook.pb.Filter;
@@ -10,15 +15,20 @@ import io.grpc.Context;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import com.kegmil.example.pcbook.pb.Laptop;
+import org.elasticsearch.search.builder.SearchSourceBuilder;
 
+import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 public class LaptopService extends LaptopServiceGrpc.LaptopServiceImplBase {
 
   private static final Logger logger = Logger.getLogger(LaptopService.class.getName());
 
-  private LaptopStore laptopStore;
+  private final LaptopStore laptopStore;
+  private JavaElasticSearch javaElasticSearch;
 
   public LaptopService(LaptopStore laptopStore) {
     this.laptopStore = laptopStore;
@@ -53,6 +63,7 @@ public class LaptopService extends LaptopServiceGrpc.LaptopServiceImplBase {
     Laptop other = laptop.toBuilder().setId(uuid.toString()).build();
     try {
       laptopStore.save(other);
+      syncDataToElasticSearch(other);
     } catch (AlreadyExistException e) {
       responseObserver.onError(
           Status.ALREADY_EXISTS
@@ -72,6 +83,11 @@ public class LaptopService extends LaptopServiceGrpc.LaptopServiceImplBase {
     logger.info("Saved laptop with ID: " + other.getId());
   }
 
+  public void syncDataToElasticSearch(Laptop laptop) {
+    String itemJson = JsonHelper.mapLaptopProtoToJson(laptop);
+    JavaElasticSearch.pushData("sampleindex", itemJson);
+  }
+
   @Override
   public void searchLaptop(SearchLaptopRequest request, StreamObserver<SearchLaptopResponse> responseObserver) {
     Filter filter = request.getFilter();
@@ -85,5 +101,32 @@ public class LaptopService extends LaptopServiceGrpc.LaptopServiceImplBase {
 
     responseObserver.onCompleted();
     logger.info("Search laptop completed");
+  }
+
+  @Override
+  public void advancedSearch(SearchLaptopRequest request, StreamObserver<SearchLaptopResponse> responseObserver) {
+    Filter filter = request.getFilter();
+    logger.info("advancedSearch Laptop:\n" + filter);
+
+    SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder()
+            .from(0)
+            .size(10);
+    searchSourceBuilder.query(SearchBuildHelper.buildQueryBuilder(filter));
+    SearchResult<com.kegmil.example.pcbook.data.Laptop> result =
+            JavaElasticSearch.search("sampleindex", searchSourceBuilder, com.kegmil.example.pcbook.data.Laptop.class);
+
+    logger.info("Result search size:: " + result.getTotalHits());
+
+    result.getHits().forEach(laptop -> {
+      try {
+        Laptop laptopProto = ProtoEntityMapper.toProto(laptop, Laptop.newBuilder()).build();
+        SearchLaptopResponse response = SearchLaptopResponse.newBuilder().setLaptop(laptopProto).build();
+        responseObserver.onNext(response);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    });
+    responseObserver.onCompleted();
+    logger.info("Advanced Search laptop completed");
   }
 }

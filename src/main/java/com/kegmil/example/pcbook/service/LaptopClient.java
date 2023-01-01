@@ -1,5 +1,6 @@
 package com.kegmil.example.pcbook.service;
 
+import com.kegmil.example.pcbook.mapper.JsonHelper;
 import com.kegmil.example.pcbook.pb.CreateLaptopRequest;
 import com.kegmil.example.pcbook.pb.CreateLaptopResponse;
 import com.kegmil.example.pcbook.pb.Filter;
@@ -27,7 +28,6 @@ public class LaptopClient {
 
   public LaptopClient(String host, int port) {
     channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
-
     blockingStub = LaptopServiceGrpc.newBlockingStub(channel);
   }
 
@@ -71,15 +71,30 @@ public class LaptopClient {
     logger.info("Search completed");
   }
 
+  private void advancedSearchLaptop(Filter filter) {
+    logger.info("Advanced search :: ");
+
+    SearchLaptopRequest request = SearchLaptopRequest.newBuilder().setFilter(filter).build();
+    Iterator<SearchLaptopResponse> responseIterator = blockingStub.advancedSearch(request);
+
+    while (responseIterator.hasNext()) {
+      SearchLaptopResponse response = responseIterator.next();
+      Laptop laptop = response.getLaptop();
+      logger.info("- found: " + laptop.getId() + " - branch: " + laptop.getBrand());
+    }
+
+    logger.info("Search completed");
+  }
+
   public static void main(String[] args) throws InterruptedException {
     LaptopClient client = new LaptopClient("0.0.0.0", 6565);
     Generator generator = new Generator();
 
     try {
-      for (int i = 0; i < 10; i++) {
-        Laptop laptop = generator.newLaptop();
-        client.createLaptop(laptop);
-      }
+//      for (int i = 0; i < 10; i++) {
+//        Laptop laptop = generator.newLaptop();
+//        client.createLaptop(laptop);
+//      }
 
       Memory minRam = Memory.newBuilder().setValue(8).setUnit(Memory.Unit.GIGABYTE).build();
       Filter filter = Filter.newBuilder()
@@ -89,7 +104,9 @@ public class LaptopClient {
           .setMinRam(minRam)
           .build();
 
-      client.searchLaptop(filter);
+      //search on database
+//      client.searchLaptop(filter);
+      client.advancedSearchLaptop(filter);
 
     } finally {
       client.shutdown();

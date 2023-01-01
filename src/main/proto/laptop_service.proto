@@ -27,4 +27,5 @@ message SearchLaptopResponse {
 service LaptopService {
   rpc createLaptop(CreateLaptopRequest) returns (CreateLaptopResponse) {};
   rpc searchLaptop(SearchLaptopRequest) returns (stream SearchLaptopResponse) {};
+  rpc advancedSearch(SearchLaptopRequest) returns (stream SearchLaptopResponse) {};
 }

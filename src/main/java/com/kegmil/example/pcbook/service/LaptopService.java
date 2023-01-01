@@ -63,7 +63,6 @@ public class LaptopService extends LaptopServiceGrpc.LaptopServiceImplBase {
     Laptop other = laptop.toBuilder().setId(uuid.toString()).build();
     try {
       laptopStore.save(other);
-      syncDataToElasticSearch(other);
     } catch (AlreadyExistException e) {
       responseObserver.onError(
           Status.ALREADY_EXISTS
@@ -84,8 +83,7 @@ public class LaptopService extends LaptopServiceGrpc.LaptopServiceImplBase {
   }
 
   public void syncDataToElasticSearch(Laptop laptop) {
-    String itemJson = JsonHelper.mapLaptopProtoToJson(laptop);
-    JavaElasticSearch.pushData("sampleindex", itemJson);
+    //do something here ? option :)
   }
 
   @Override
@@ -108,24 +106,9 @@ public class LaptopService extends LaptopServiceGrpc.LaptopServiceImplBase {
     Filter filter = request.getFilter();
     logger.info("advancedSearch Laptop:\n" + filter);
 
-    SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder()
-            .from(0)
-            .size(10);
-    searchSourceBuilder.query(SearchBuildHelper.buildQueryBuilder(filter));
-    SearchResult<com.kegmil.example.pcbook.data.Laptop> result =
-            JavaElasticSearch.search("sampleindex", searchSourceBuilder, com.kegmil.example.pcbook.data.Laptop.class);
+    //handle code here
+    //searching on elastic search
 
-    logger.info("Result search size:: " + result.getTotalHits());
-
-    result.getHits().forEach(laptop -> {
-      try {
-        Laptop laptopProto = ProtoEntityMapper.toProto(laptop, Laptop.newBuilder()).build();
-        SearchLaptopResponse response = SearchLaptopResponse.newBuilder().setLaptop(laptopProto).build();
-        responseObserver.onNext(response);
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    });
     responseObserver.onCompleted();
     logger.info("Advanced Search laptop completed");
   }

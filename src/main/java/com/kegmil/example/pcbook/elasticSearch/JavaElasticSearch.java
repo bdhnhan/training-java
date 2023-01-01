@@ -37,7 +37,6 @@ public class JavaElasticSearch {
     };
 
     public static BulkResponse pushData(String realm, String item) {
-        logger.info(item);
         try {
             RestHighLevelClient restHighLevelClient = new RestHighLevelClient(
                     RestClient.builder(new HttpHost("localhost", 9200, "http"))
